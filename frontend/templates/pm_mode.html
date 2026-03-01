@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}PM Mode — Project Delivery Copilot{% endblock %}
+
+{% block content %}
+<h1 class="section-title">PM Mode — Jira Natural Language Query</h1>
+<p class="text-muted" style="margin-bottom:1.5rem;">Ask Jira anything in plain English. The app generates JQL and returns results.</p>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<div class="card">
+  <p class="card-title">Ask Jira…</p>
+  <form method="post" action="/pm">
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <div class="form-group">
+      <label for="query">Your question</label>
+      <textarea id="query" name="query" class="small" placeholder='e.g. "Show me open bugs in the last 7 days." or "What stories are blocked right now?"'>{% if result %}{{ result.jql }}{% endif %}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Run Query</button>
+  </form>
+
+  <div class="mt-2" style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+    <span class="text-muted" style="font-size:0.8rem; align-self:center;">Try:</span>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('query').value='Show me open bugs in the last 7 days'">Open bugs (7d)</button>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('query').value='What is blocked right now?'">What\'s blocked?</button>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('query').value='List all stories in progress'">In progress stories</button>
+    <button class="btn btn-secondary btn-sm" onclick="document.getElementById('query').value='Show me high priority issues assigned to me'">My high priority</button>
+  </div>
+</div>
+
+{% if result %}
+<div class="card">
+  <p class="card-title">Generated JQL</p>
+  <div class="jql-box">{{ result.jql }}</div>
+
+  {% if not result.results %}
+  {% if result.total == 0 %}
+  <div class="alert alert-info">No issues found matching this query.</div>
+  {% else %}
+  <div class="alert alert-warning">Jira is not configured — JQL generated but no results fetched. Set Jira credentials in .env to see results.</div>
+  {% endif %}
+  {% else %}
+  <p class="text-muted" style="margin-bottom:0.75rem; font-size:0.875rem;">{{ result.total }} issue(s) found (showing up to 50)</p>
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Type</th>
+        <th>Summary</th>
+        <th>Status</th>
+        <th>Priority</th>
+        <th>Assignee</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for issue in result.results %}
+      <tr>
+        <td><code>{{ issue.key }}</code></td>
+        <td><span class="badge badge-category">{{ issue.issue_type }}</span></td>
+        <td>{{ issue.summary }}</td>
+        <td>{{ issue.status }}</td>
+        <td>{{ issue.priority or "—" }}</td>
+        <td>{{ issue.assignee or "Unassigned" }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

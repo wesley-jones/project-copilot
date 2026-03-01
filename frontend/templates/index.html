@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Home — Project Delivery Copilot{% endblock %}
+
+{% block content %}
+<h1 style="font-size:1.5rem; font-weight:700; margin-bottom:0.5rem;">Project Delivery Copilot</h1>
+<p class="text-muted">An agentic workflow assistant for BAs and PMs. Pick a mode to get started.</p>
+
+<div class="mode-grid">
+  <a href="/ba/requirements" class="mode-card">
+    <div class="mode-icon">📝</div>
+    <h2>BA Mode</h2>
+    <p>Draft requirements, generate story sets, run readiness checks, and push to Jira — all with natural language refinement at every step.</p>
+    <br/>
+    <span class="btn btn-primary btn-sm" style="pointer-events:none;">Open BA Mode →</span>
+  </a>
+
+  <a href="/pm" class="mode-card">
+    <div class="mode-icon">📊</div>
+    <h2>PM Mode</h2>
+    <p>Query Jira using plain English. Ask what's blocked, list stories in an epic, or find open bugs — the app generates JQL and fetches results.</p>
+    <br/>
+    <span class="btn btn-primary btn-sm" style="pointer-events:none;">Open PM Mode →</span>
+  </a>
+</div>
+
+<div class="card mt-3">
+  <p class="card-title">Your session</p>
+  <p class="text-muted" style="font-family:monospace; font-size:0.85rem;">{{ session_id }}</p>
+  <p class="text-muted mt-1">All your work (requirements, stories, readiness reports) is stored locally under <code>local_data/{{ session_id }}/</code>.</p>
+</div>
+{% endblock %}

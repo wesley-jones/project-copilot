@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Requirements — Project Delivery Copilot{% endblock %}
+
+{% block content %}
+<div class="sub-nav">
+  <a href="/ba/requirements" class="active">Requirements</a>
+  <a href="/ba/stories">Stories</a>
+  <a href="/ba/readiness">Readiness</a>
+</div>
+
+<h1 class="section-title">BA Requirements</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+{% if upload_message %}
+<div class="alert alert-success">{{ upload_message }}</div>
+{% endif %}
+
+<!-- Generate form -->
+<div class="card">
+  <p class="card-title">Generate Requirements from Raw Notes</p>
+  <form method="post" action="/ba/requirements">
+    <input type="hidden" name="action" value="generate" />
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <div class="form-group">
+      <label for="raw_notes">Raw Notes</label>
+      <textarea id="raw_notes" name="raw_notes" class="notes" placeholder="Paste your raw notes, meeting summaries, or rough ideas here...">{{ submitted_raw_notes if submitted_raw_notes is defined and submitted_raw_notes else workspace.raw_notes }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-primary">Generate Requirements</button>
+  </form>
+</div>
+
+<!-- Update form (only if draft exists) -->
+{% if workspace.requirements_draft %}
+<div class="card">
+  <p class="card-title">Refine Requirements</p>
+  <form method="post" action="/ba/requirements">
+    <input type="hidden" name="action" value="update" />
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <div class="form-group">
+      <label for="edit_instruction">Edit Instruction</label>
+      <textarea id="edit_instruction" name="edit_instruction" class="small" placeholder='e.g. "Add an edge case for refunds." or "Split the payment section into two separate requirements."'></textarea>
+    </div>
+    <button type="submit" class="btn btn-secondary">Apply Update</button>
+  </form>
+</div>
+{% endif %}
+
+<!-- Upload docs -->
+<div class="card">
+  <p class="card-title">Upload Supporting Document</p>
+  <p class="text-muted" style="margin-bottom:0.75rem;">Upload a .txt or .md file to include in readiness checks.</p>
+  <form method="post" action="/ba/docs/upload" enctype="multipart/form-data">
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <div class="form-row">
+      <div style="flex:1">
+        <input type="file" name="file" accept=".txt,.md" />
+      </div>
+      <button type="submit" class="btn btn-secondary">Upload</button>
+    </div>
+  </form>
+  {% if workspace.uploaded_docs %}
+  <div class="mt-2">
+    <p class="text-muted" style="font-size:0.8rem;">Uploaded: {% for d in workspace.uploaded_docs %}<code>{{ d }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Current requirements display -->
+{% if result %}
+<div class="card">
+  <p class="card-title">Structured Requirements</p>
+  <div class="result-box requirements-output">{{ result.requirements }}</div>
+
+  {% if result.clarifying_questions %}
+  <hr class="divider" />
+  <p class="card-title">Clarifying Questions</p>
+  <ol style="padding-left:1.25rem; font-size:0.875rem;">
+    {% for q in result.clarifying_questions %}<li>{{ q }}</li>{% endfor %}
+  </ol>
+  {% endif %}
+
+  {% if result.assumptions %}
+  <hr class="divider" />
+  <p class="card-title">Assumptions</p>
+  <ol style="padding-left:1.25rem; font-size:0.875rem;">
+    {% for a in result.assumptions %}<li>{{ a }}</li>{% endfor %}
+  </ol>
+  {% endif %}
+
+  <div class="mt-2">
+    <a href="/ba/stories" class="btn btn-primary btn-sm">Generate Story Set →</a>
+  </div>
+</div>
+
+{% elif workspace.requirements_draft %}
+<div class="card">
+  <p class="card-title">Current Requirements Draft</p>
+  <div class="result-box requirements-output">{{ workspace.requirements_draft }}</div>
+  <div class="mt-2">
+    <a href="/ba/stories" class="btn btn-primary btn-sm">Generate Story Set →</a>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

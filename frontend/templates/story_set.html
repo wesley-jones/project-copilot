@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Story Set — Project Delivery Copilot{% endblock %}
+
+{% block content %}
+<div class="sub-nav">
+  <a href="/ba/requirements">Requirements</a>
+  <a href="/ba/stories" class="active">Stories</a>
+  <a href="/ba/readiness">Readiness</a>
+</div>
+
+<h1 class="section-title">Story Set</h1>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if not workspace.requirements_draft %}
+<div class="alert alert-warning">No requirements draft found. <a href="/ba/requirements">Generate requirements first.</a></div>
+{% else %}
+
+<!-- Current requirements context -->
+<details class="card" style="cursor:pointer;">
+  <summary class="card-title" style="user-select:none;">Current Requirements (click to expand)</summary>
+  <div class="result-box requirements-output mt-2">{{ workspace.requirements_draft }}</div>
+</details>
+
+<!-- Generate -->
+<div class="card">
+  <p class="card-title">Generate Story Set</p>
+  <form method="post" action="/ba/stories">
+    <input type="hidden" name="action" value="generate" />
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <button type="submit" class="btn btn-primary">Generate Story Set (JSON)</button>
+  </form>
+</div>
+
+<!-- Update (if story set exists) -->
+{% if workspace.story_set %}
+<div class="card">
+  <p class="card-title">Refine Stories</p>
+  <form method="post" action="/ba/stories">
+    <input type="hidden" name="action" value="update" />
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <div class="form-group">
+      <label for="edit_instruction">Story changes</label>
+      <textarea id="edit_instruction" name="edit_instruction" class="small" placeholder='e.g. "Split story 2 into two separate stories." or "Add an edge case for expired sessions to story 3."'></textarea>
+    </div>
+    <button type="submit" class="btn btn-secondary">Apply Story Update</button>
+  </form>
+</div>
+{% endif %}
+
+{% endif %}
+
+<!-- Story display -->
+{% set display_set = result.story_set if result else (workspace.story_set if workspace.story_set else none) %}
+
+{% if display_set %}
+<div class="card">
+  <div class="flex items-center gap-2" style="margin-bottom:1rem;">
+    <p class="card-title" style="margin:0;">Story Set</p>
+    <a href="/ba/readiness" class="btn btn-primary btn-sm" style="margin-left:auto;">Run Readiness Check →</a>
+  </div>
+
+  <!-- Epic -->
+  <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:1rem; margin-bottom:1rem;">
+    <div class="flex items-center gap-2" style="margin-bottom:0.5rem;">
+      <span class="badge" style="background:#1d4ed8;color:#fff;">EPIC</span>
+      {% if display_set.epic.priority %}<span class="badge badge-category">{{ display_set.epic.priority }}</span>{% endif %}
+    </div>
+    <h3 style="font-size:1rem;">{{ display_set.epic.title }}</h3>
+    <p style="font-size:0.875rem; color:var(--muted); margin-top:0.35rem;">{{ display_set.epic.description }}</p>
+    {% if display_set.epic.labels %}
+    <div class="meta mt-1">{% for l in display_set.epic.labels %}<span class="tag">{{ l }}</span>{% endfor %}</div>
+    {% endif %}
+  </div>
+
+  <!-- Stories -->
+  {% for story in display_set.stories %}
+  <div class="story-card">
+    <div class="flex items-center gap-2" style="margin-bottom:0.35rem;">
+      <span class="badge" style="background:#e0e7ff;color:#3730a3;">STORY {{ loop.index }}</span>
+      {% if story.priority %}<span class="badge badge-category">{{ story.priority }}</span>{% endif %}
+    </div>
+    <h4>{{ story.title }}</h4>
+    <p class="text-muted" style="font-size:0.85rem; margin-bottom:0.5rem;">{{ story.description }}</p>
+
+    {% if story.labels %}
+    <div class="meta">{% for l in story.labels %}<span class="tag">{{ l }}</span>{% endfor %}</div>
+    {% endif %}
+
+    {% if story.acceptance_criteria %}
+    <p style="font-size:0.78rem; font-weight:600; text-transform:uppercase; color:var(--muted); margin-bottom:0.25rem;">Acceptance Criteria</p>
+    <ul class="ac-list">
+      {% for ac in story.acceptance_criteria %}<li>{{ ac }}</li>{% endfor %}
+    </ul>
+    {% endif %}
+
+    {% if story.notes %}
+    <p class="text-muted mt-1" style="font-size:0.82rem;"><strong>Notes:</strong> {{ story.notes }}</p>
+    {% endif %}
+
+    {% if story.dependencies %}
+    <p class="text-muted mt-1" style="font-size:0.82rem;"><strong>Dependencies:</strong> {{ story.dependencies | join(", ") }}</p>
+    {% endif %}
+
+    {% if story.subtasks %}
+    <div class="mt-1">
+      <p style="font-size:0.78rem; font-weight:600; text-transform:uppercase; color:var(--muted); margin-bottom:0.25rem;">Subtasks</p>
+      {% for st in story.subtasks %}
+      <div style="padding:0.3rem 0.5rem; background:var(--bg); border-radius:4px; font-size:0.82rem; margin-bottom:0.2rem;">
+        <strong>{{ st.title }}</strong>{% if st.description %} — {{ st.description }}{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+  {% endfor %}
+
+  <!-- Raw JSON — workspace.story_set is always a plain dict (saved before result is returned) -->
+  <details style="margin-top:1rem;">
+    <summary class="text-muted" style="cursor:pointer; font-size:0.85rem;">Show raw JSON</summary>
+    <pre class="json-output mt-1">{{ workspace.story_set | tojson(indent=2) }}</pre>
+  </details>
+</div>
+{% endif %}
+
+{% endblock %}
