@@ -4,13 +4,16 @@ FastAPI application with Jinja2 server-rendered UI.
 """
 from __future__ import annotations
 
+import csv
+import io
 import logging
 import os
 import uuid
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -18,7 +21,7 @@ from backend.app.config import get_settings
 from backend.app.routers import ba, jira, pm
 from backend.app.services.ba_agent import BAAgent
 from backend.app.services.document_store import get_document_store
-from backend.app.services.jira_client import get_jira_client
+from backend.app.services.jira_client import JiraError, get_jira_client
 from backend.app.services.llm_client import LLMError, get_llm_client
 from backend.app.services.pm_agent import PMAgent
 from backend.app.services.prompt_loader import get_prompt_loader
@@ -378,6 +381,8 @@ async def pm_post(
     error = None
     try:
         result = pm_agent.query(session_id, query)
+    except JiraError as exc:
+        error = str(exc)
     except (LLMError, ValueError, FileNotFoundError) as exc:
         error = str(exc)
     except Exception as exc:
@@ -397,6 +402,58 @@ async def pm_post(
     )
     response.set_cookie("session_id", session_id, httponly=True)
     return response
+
+
+@app.post("/pm/export-csv")
+async def pm_export_csv(
+    session_id: str = Form(...),
+    jql: str = Form(...),
+):
+    del session_id  # Reserved for future session-scoped export audit/history.
+
+    jql_value = jql.strip()
+    if not jql_value:
+        raise HTTPException(status_code=400, detail="JQL is required for CSV export.")
+
+    jira_client = get_jira_client()
+    if not jira_client.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Jira is not configured. Set Jira credentials in .env before exporting CSV.",
+        )
+
+    try:
+        data = jira_client.search_issues(jql_value, max_results=1000)
+    except JiraError as exc:
+        raise HTTPException(status_code=exc.status_code or 502, detail=str(exc)) from exc
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Key", "Type", "Summary", "Status", "Priority", "Assignee", "Jira URL"])
+
+    for issue in data.get("issues", []):
+        fields = issue.get("fields", {})
+        key = issue.get("key", "")
+        issue_url = f"{jira_client._base}/browse/{key}" if key else ""
+        writer.writerow(
+            [
+                key,
+                fields.get("issuetype", {}).get("name", ""),
+                fields.get("summary", ""),
+                fields.get("status", {}).get("name", ""),
+                (fields.get("priority") or {}).get("name", ""),
+                (fields.get("assignee") or {}).get("displayName", ""),
+                issue_url,
+            ]
+        )
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"jira_export_{timestamp}.csv"
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 # ---------------------------------------------------------------------------

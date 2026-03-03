@@ -33,6 +33,11 @@
 <div class="card">
   <p class="card-title">Generated JQL</p>
   <div class="jql-box">{{ result.jql }}</div>
+  <form method="post" action="/pm/export-csv" style="margin-top:0.75rem;">
+    <input type="hidden" name="session_id" value="{{ session_id }}" />
+    <input type="hidden" name="jql" value="{{ result.jql }}" />
+    <button type="submit" class="btn btn-secondary btn-sm">Export CSV</button>
+  </form>
 
   {% if not result.results %}
   {% if result.total == 0 %}
