@@ -56,7 +56,9 @@ class PromptLoader:
         Returns empty string if file is missing/unreadable.
         """
         path = self._settings.pm_user_prompt_file
+        resolved = path.resolve()
         if not path.exists():
+            logger.info("PM override prompt not found at '%s' (resolved: '%s').", path, resolved)
             return ""
         try:
             text = path.read_text(encoding="utf-8", errors="replace")
@@ -71,7 +73,20 @@ class PromptLoader:
                 max_chars,
             )
             text = text[:max_chars]
+        logger.info(
+            "PM override prompt loaded from '%s' (resolved: '%s'), chars=%d.",
+            path,
+            resolved,
+            len(text),
+        )
+        logger.debug("PM override prompt preview: %s", self._preview(text))
         return text
+
+    def _preview(self, text: str, limit: int = 300) -> str:
+        compact = " ".join((text or "").split())
+        if len(compact) > limit:
+            return compact[:limit] + " ...(truncated)"
+        return compact
 
 
 def get_prompt_loader() -> PromptLoader:

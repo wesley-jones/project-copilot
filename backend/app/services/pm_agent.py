@@ -29,12 +29,25 @@ class PMAgent:
 
     def query(self, session_id: str, natural_language_query: str) -> PMQueryResponse:
         system = self._pl.load_prompt("pm_jira_query.md")
+        base_len = len(system)
         user_override = self._pl.load_pm_user_override().strip()
         if user_override:
             system += (
                 "\n\n---\n## User Jira Context (Instance-Specific Override)\n"
                 "Use the following details as authoritative for field names, team names, and conventions.\n\n"
                 f"{user_override}"
+            )
+            logger.info(
+                "PM override applied. base_prompt_chars=%d override_chars=%d final_prompt_chars=%d",
+                base_len,
+                len(user_override),
+                len(system),
+            )
+        else:
+            logger.info(
+                "PM override not applied. base_prompt_chars=%d final_prompt_chars=%d",
+                base_len,
+                len(system),
             )
         project_key = self._jira._settings.jira_project_key or "not set"
         messages = [
