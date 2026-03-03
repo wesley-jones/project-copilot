@@ -60,6 +60,10 @@ class LLMClient:
             "messages": messages,
             self._settings.llm_max_tokens_param: max_tokens,
         }
+        if self._settings.llm_temperature_supported:
+            payload["temperature"] = temperature
+        if self._settings.llm_seed is not None:
+            payload["seed"] = self._settings.llm_seed
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         return payload

@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     llm_max_retries: int = 2
     # Set to false for models that reject the temperature parameter (e.g. gpt-5, o1, o3)
     llm_temperature_supported: bool = True
+    # Optional fixed seed for providers/models that support deterministic sampling.
+    llm_seed: Optional[int] = None
     # Token limit param name: "max_tokens" (most OpenAI-compatible APIs) or
     # "max_completion_tokens" (required by gpt-5 / newer OpenAI models)
     llm_max_tokens_param: str = "max_tokens"
