@@ -16,7 +16,8 @@ class SessionWorkspace(BaseModel):
     requirements_draft: str = ""
     story_set: Optional[dict[str, Any]] = None
     readiness_report: Optional[dict[str, Any]] = None
-    uploaded_docs: list[str] = Field(default_factory=list)  # list of filenames
+    uploaded_docs: list[str] = Field(default_factory=list)  # list of filenames (readiness)
+    context_docs: dict[str, str] = Field(default_factory=dict)  # filename → extracted text (requirements)
 
 
 # ---------------------------------------------------------------------------

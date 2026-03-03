@@ -81,15 +81,21 @@ class BAAgent:
         self._store.save_workspace(ws)  # persist before LLM call so notes survive errors
 
         system = self._system_requirements()
+        user_content = (
+            "Please process the following raw notes into structured requirements.\n\n"
+            f"## Raw Notes\n{raw_notes}"
+        )
+        if ws.context_docs:
+            doc_block = "\n\n".join(
+                f"--- Uploaded Document: {name} ---\n{text}"
+                for name, text in ws.context_docs.items()
+                if text.strip()
+            )
+            if doc_block:
+                user_content += f"\n\n## Uploaded Supporting Documents\n{doc_block}"
         messages = [
             {"role": "system", "content": system},
-            {
-                "role": "user",
-                "content": (
-                    "Please process the following raw notes into structured requirements.\n\n"
-                    f"## Raw Notes\n{raw_notes}"
-                ),
-            },
+            {"role": "user", "content": user_content},
         ]
         raw = self._llm.chat(messages, temperature=0.3)
         result = self._parse_requirements_output(raw)

@@ -13,9 +13,7 @@
     <span class="brand">📋 Delivery Copilot</span>
     <div class="nav-links">
       <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">Home</a>
-      <a href="/ba/requirements" class="nav-link {% if '/ba/requirements' in request.url.path %}active{% endif %}">Requirements</a>
-      <a href="/ba/stories" class="nav-link {% if '/ba/stories' in request.url.path %}active{% endif %}">Stories</a>
-      <a href="/ba/readiness" class="nav-link {% if '/ba/readiness' in request.url.path %}active{% endif %}">Readiness</a>
+      <a href="/ba/requirements" class="nav-link {% if '/ba/' in request.url.path %}active{% endif %}">BA Mode</a>
       <a href="/pm" class="nav-link {% if '/pm' in request.url.path %}active{% endif %}">PM Mode</a>
     </div>
     <span class="session-badge" title="Your session ID">Session: {{ session_id[:8] if session_id else '—' }}…</span>

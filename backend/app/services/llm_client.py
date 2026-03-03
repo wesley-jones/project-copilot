@@ -34,9 +34,16 @@ class LLMClient:
         return self._settings.llm_api_base.rstrip("/")
 
     @property
+    def _api_key(self) -> str:
+        s = self._settings
+        if s.llm_access_key and s.llm_secret_key:
+            return f"{s.llm_access_key}:{s.llm_secret_key}"
+        return s.llm_api_key
+
+    @property
     def _headers(self) -> dict[str, str]:
         return {
-            "Authorization": f"Bearer {self._settings.llm_api_key}",
+            "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
 
@@ -51,7 +58,7 @@ class LLMClient:
         payload: dict[str, Any] = {
             "model": self._settings.llm_model_name,
             "messages": messages,
-            "max_completion_tokens": max_tokens,
+            self._settings.llm_max_tokens_param: max_tokens,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
@@ -82,7 +89,10 @@ class LLMClient:
         last_exc: Optional[Exception] = None
         for attempt in range(self._settings.llm_max_retries + 1):
             try:
-                with httpx.Client(timeout=self._settings.llm_timeout) as client:
+                with httpx.Client(
+                    timeout=self._settings.llm_timeout,
+                    verify=self._settings.llm_ca_bundle or True,
+                ) as client:
                     resp = client.post(url, headers=self._headers, json=payload)
                 resp.raise_for_status()
                 data = resp.json()
@@ -94,7 +104,10 @@ class LLMClient:
                 logger.warning("LLM timeout on attempt %d: %s", attempt + 1, exc)
             except httpx.HTTPStatusError as exc:
                 status = exc.response.status_code
-                if status in (429, 500, 502, 503, 504):
+                body = exc.response.text
+                logger.error("LLM HTTP %d response body: %s", status, body)
+                # 429/502/503/504 are transient — retry. 500 is a hard server error — surface immediately.
+                if status in (429, 502, 503, 504):
                     last_exc = exc
                     wait = 2 ** attempt
                     logger.warning(
@@ -102,7 +115,7 @@ class LLMClient:
                     )
                     time.sleep(wait)
                 else:
-                    raise LLMError(f"LLM HTTP error {status}: {exc.response.text[:200]}") from exc
+                    raise LLMError(f"LLM HTTP error {status}: {body}") from exc
             except Exception as exc:
                 raise LLMError(f"LLM unexpected error: {exc}") from exc
 

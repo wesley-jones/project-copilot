@@ -9,7 +9,7 @@ import os
 import uuid
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -246,28 +246,68 @@ async def ba_readiness_post(
     return response
 
 
-@app.post("/ba/docs/upload", response_class=HTMLResponse)
-async def ba_docs_upload_ui(
+# ---------------------------------------------------------------------------
+# Requirements document upload
+# ---------------------------------------------------------------------------
+
+_ALLOWED_CONTEXT_EXTS = {".docx", ".xlsx", ".txt", ".md"}
+
+
+def _extract_text(filename: str, content: bytes) -> str:
+    """Extract plain text from an uploaded file."""
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in _ALLOWED_CONTEXT_EXTS:
+        raise ValueError(f"Unsupported file type '{ext}'. Allowed: {', '.join(sorted(_ALLOWED_CONTEXT_EXTS))}")
+    if ext == ".docx":
+        import io
+        from docx import Document  # type: ignore[import-untyped]
+        doc = Document(io.BytesIO(content))
+        parts: list[str] = [p.text for p in doc.paragraphs if p.text.strip()]
+        for table in doc.tables:
+            for row in table.rows:
+                row_text = "\t".join(cell.text.strip() for cell in row.cells)
+                if row_text.strip():
+                    parts.append(row_text)
+        return "\n".join(parts)
+    if ext == ".xlsx":
+        import io
+        import openpyxl  # type: ignore[import-untyped]
+        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        parts = []
+        for sheet in wb.worksheets:
+            parts.append(f"[Sheet: {sheet.title}]")
+            for row in sheet.iter_rows(values_only=True):
+                row_text = "\t".join(str(v) if v is not None else "" for v in row)
+                if row_text.strip():
+                    parts.append(row_text)
+        return "\n".join(parts)
+    # .txt / .md
+    return content.decode("utf-8", errors="replace")
+
+
+@app.post("/ba/requirements/upload", response_class=HTMLResponse)
+async def ba_requirements_upload(
     request: Request,
     session_id: str = Form(...),
     file: UploadFile = File(...),
 ):
-    import os
     store = get_document_store()
-    error = None
-    message = None
-    allowed = {".txt", ".md"}
+    upload_error = None
+    upload_message = None
     ext = os.path.splitext(file.filename or "")[1].lower()
-    if ext not in allowed:
-        error = f"Only {allowed} files are supported."
+    if ext not in _ALLOWED_CONTEXT_EXTS:
+        upload_error = f"Unsupported file type. Allowed: {', '.join(sorted(_ALLOWED_CONTEXT_EXTS))}"
     else:
-        content = await file.read()
-        filename = store.save_doc(session_id, file.filename or "upload.txt", content)
-        ws = store.load_workspace(session_id)
-        if filename not in ws.uploaded_docs:
-            ws.uploaded_docs.append(filename)
-        store.save_workspace(ws)
-        message = f"Uploaded {filename} successfully."
+        try:
+            content = await file.read()
+            filename = os.path.basename(file.filename or "upload")
+            text = _extract_text(filename, content)
+            ws = store.load_workspace(session_id)
+            ws.context_docs[filename] = text
+            store.save_workspace(ws)
+            upload_message = f"'{filename}' uploaded and will be included when generating requirements."
+        except Exception as exc:
+            upload_error = f"Failed to process file: {exc}"
 
     ws = store.load_workspace(session_id)
     response = templates.TemplateResponse(
@@ -277,8 +317,33 @@ async def ba_docs_upload_ui(
             "session_id": session_id,
             "workspace": ws,
             "result": None,
-            "error": error,
-            "upload_message": message,
+            "error": None,
+            "upload_message": upload_message,
+            "upload_error": upload_error,
+        },
+    )
+    response.set_cookie("session_id", session_id, httponly=True)
+    return response
+
+
+@app.post("/ba/requirements/remove-doc", response_class=HTMLResponse)
+async def ba_requirements_remove_doc(
+    request: Request,
+    session_id: str = Form(...),
+    filename: str = Form(...),
+):
+    store = get_document_store()
+    ws = store.load_workspace(session_id)
+    ws.context_docs.pop(filename, None)
+    store.save_workspace(ws)
+    response = templates.TemplateResponse(
+        "ba_requirements.html",
+        {
+            "request": request,
+            "session_id": session_id,
+            "workspace": ws,
+            "result": None,
+            "error": None,
         },
     )
     response.set_cookie("session_id", session_id, httponly=True)

@@ -13,9 +13,6 @@
 {% if error %}
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
-{% if upload_message %}
-<div class="alert alert-success">{{ upload_message }}</div>
-{% endif %}
 
 <!-- Generate form -->
 <div class="card">
@@ -47,22 +44,38 @@
 </div>
 {% endif %}
 
-<!-- Upload docs -->
+<!-- Supporting documents -->
 <div class="card">
-  <p class="card-title">Upload Supporting Document</p>
-  <p class="text-muted" style="margin-bottom:0.75rem;">Upload a .txt or .md file to include in readiness checks.</p>
-  <form method="post" action="/ba/docs/upload" enctype="multipart/form-data">
+  <p class="card-title">Supporting Documents</p>
+  <p class="text-muted" style="margin-bottom:0.75rem;">Upload Word (.docx), Excel (.xlsx), or text (.txt, .md) files to include their content when generating requirements.</p>
+  {% if upload_message is defined and upload_message %}
+  <div class="alert alert-success" style="margin-bottom:0.75rem;">{{ upload_message }}</div>
+  {% endif %}
+  {% if upload_error is defined and upload_error %}
+  <div class="alert alert-error" style="margin-bottom:0.75rem;">{{ upload_error }}</div>
+  {% endif %}
+  <form method="post" action="/ba/requirements/upload" enctype="multipart/form-data">
     <input type="hidden" name="session_id" value="{{ session_id }}" />
     <div class="form-row">
       <div style="flex:1">
-        <input type="file" name="file" accept=".txt,.md" />
+        <input type="file" name="file" accept=".docx,.xlsx,.txt,.md" />
       </div>
       <button type="submit" class="btn btn-secondary">Upload</button>
     </div>
   </form>
-  {% if workspace.uploaded_docs %}
+  {% if workspace.context_docs %}
   <div class="mt-2">
-    <p class="text-muted" style="font-size:0.8rem;">Uploaded: {% for d in workspace.uploaded_docs %}<code>{{ d }}</code>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+    <p class="text-muted" style="font-size:0.8rem; margin-bottom:0.5rem;">Included in next generation:</p>
+    {% for filename in workspace.context_docs %}
+    <div class="form-row" style="align-items:center; margin-bottom:0.35rem;">
+      <span style="flex:1; font-size:0.85rem;">{{ filename }}</span>
+      <form method="post" action="/ba/requirements/remove-doc" style="margin:0;">
+        <input type="hidden" name="session_id" value="{{ session_id }}" />
+        <input type="hidden" name="filename" value="{{ filename }}" />
+        <button type="submit" class="btn btn-sm" style="padding:0.2rem 0.6rem; font-size:0.75rem;">Remove</button>
+      </form>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 </div>

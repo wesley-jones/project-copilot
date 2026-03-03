@@ -1,5 +1,6 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,10 +11,19 @@ class Settings(BaseSettings):
     llm_api_base: str = "https://api.openai.com/v1"
     llm_model_name: str = "gpt-4o"
     llm_api_key: str = ""
+    # Alternative auth: access_key + secret_key combined as "access_key:secret_key" Bearer token.
+    # When both are set they take priority over llm_api_key.
+    llm_access_key: str = ""
+    llm_secret_key: str = ""
     llm_timeout: int = 300
     llm_max_retries: int = 2
     # Set to false for models that reject the temperature parameter (e.g. gpt-5, o1, o3)
     llm_temperature_supported: bool = True
+    # Token limit param name: "max_tokens" (most OpenAI-compatible APIs) or
+    # "max_completion_tokens" (required by gpt-5 / newer OpenAI models)
+    llm_max_tokens_param: str = "max_tokens"
+    # Path to a custom CA bundle (.pem) for self-signed/corporate TLS certificates
+    llm_ca_bundle: Optional[str] = None
 
     # Jira
     jira_base_url: str = ""
