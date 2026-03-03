@@ -15,7 +15,7 @@
     <input type="hidden" name="session_id" value="{{ session_id }}" />
     <div class="form-group">
       <label for="query">Your question</label>
-      <textarea id="query" name="query" class="small" placeholder='e.g. "Show me open bugs in the last 7 days." or "What stories are blocked right now?"'>{% if result %}{{ result.jql }}{% endif %}</textarea>
+      <textarea id="query" name="query" class="small" placeholder='e.g. "Show me open bugs in the last 7 days." or "What stories are blocked right now?"'>{{ submitted_query or "" }}</textarea>
     </div>
     <button type="submit" class="btn btn-primary">Run Query</button>
   </form>

@@ -360,7 +360,14 @@ async def pm_page(request: Request):
     ws = store.load_workspace(sid)
     response = templates.TemplateResponse(
         "pm_mode.html",
-        {"request": request, "session_id": sid, "workspace": ws, "result": None, "error": None},
+        {
+            "request": request,
+            "session_id": sid,
+            "workspace": ws,
+            "result": None,
+            "error": None,
+            "submitted_query": "",
+        },
     )
     response.set_cookie("session_id", sid, httponly=True)
     return response
@@ -398,6 +405,7 @@ async def pm_post(
             "workspace": ws,
             "result": result,
             "error": error,
+            "submitted_query": query,
         },
     )
     response.set_cookie("session_id", session_id, httponly=True)
