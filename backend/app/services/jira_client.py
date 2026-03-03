@@ -36,11 +36,20 @@ class JiraClient:
 
     @property
     def _headers(self) -> dict[str, str]:
-        token = b64encode(
-            f"{self._settings.jira_user}:{self._settings.jira_api_token}".encode()
-        ).decode()
+        mode = (self._settings.jira_auth_mode or "basic").strip().lower()
+        auth_value: str
+
+        if mode == "bearer" or (mode == "auto" and self._settings.jira_bearer_token):
+            token = self._settings.jira_bearer_token or self._settings.jira_api_token
+            auth_value = f"Bearer {token}"
+        else:
+            token = b64encode(
+                f"{self._settings.jira_user}:{self._settings.jira_api_token}".encode()
+            ).decode()
+            auth_value = f"Basic {token}"
+
         return {
-            "Authorization": f"Basic {token}",
+            "Authorization": auth_value,
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
@@ -49,7 +58,10 @@ class JiraClient:
         url = f"{self._base}{path}"
         safe_log_request("GET", url, self._headers)
         try:
-            with httpx.Client(timeout=self._settings.jira_timeout) as client:
+            with httpx.Client(
+                timeout=self._settings.jira_timeout,
+                verify=self._settings.jira_verify_ssl,
+            ) as client:
                 resp = client.get(url, headers=self._headers, params=params)
             resp.raise_for_status()
             return resp.json()
@@ -65,7 +77,10 @@ class JiraClient:
         url = f"{self._base}{path}"
         safe_log_request("POST", url, self._headers)
         try:
-            with httpx.Client(timeout=self._settings.jira_timeout) as client:
+            with httpx.Client(
+                timeout=self._settings.jira_timeout,
+                verify=self._settings.jira_verify_ssl,
+            ) as client:
                 resp = client.post(url, headers=self._headers, json=body)
             resp.raise_for_status()
             return resp.json()
@@ -159,7 +174,14 @@ class JiraClient:
 
     def is_configured(self) -> bool:
         s = self._settings
-        return bool(s.jira_base_url and s.jira_user and s.jira_api_token and s.jira_project_key)
+        mode = (s.jira_auth_mode or "basic").strip().lower()
+        if mode == "bearer":
+            has_auth = bool(s.jira_bearer_token or s.jira_api_token)
+        elif mode == "auto":
+            has_auth = bool(s.jira_bearer_token or (s.jira_user and s.jira_api_token))
+        else:
+            has_auth = bool(s.jira_user and s.jira_api_token)
+        return bool(s.jira_base_url and has_auth and s.jira_project_key)
 
 
 def get_jira_client() -> JiraClient:

@@ -29,8 +29,13 @@ class Settings(BaseSettings):
     jira_base_url: str = ""
     jira_user: str = ""
     jira_api_token: str = ""
+    # Jira auth mode: basic | bearer | auto
+    jira_auth_mode: str = "basic"
+    # Optional dedicated bearer token (if blank in bearer mode, jira_api_token is used)
+    jira_bearer_token: str = ""
     jira_project_key: str = ""
     jira_timeout: int = 30
+    jira_verify_ssl: bool = False
 
     # Paths
     prompts_dir: Path = Path("prompts")
