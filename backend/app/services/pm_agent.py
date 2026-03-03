@@ -9,8 +9,9 @@ import re
 
 from backend.app.schemas import JiraIssueResult, PMQueryResponse
 from backend.app.services.jira_client import JiraClient, JiraError
-from backend.app.services.llm_client import LLMClient
+from backend.app.services.llm_client import LLMClient, LLMError
 from backend.app.services.prompt_loader import PromptLoader
+from backend.app.utils import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +95,13 @@ class PMAgent:
         )
 
     def _generate_jql(self, base_messages: list[dict[str, str]], project_key: str) -> str:
-        data = self._llm.chat_json(base_messages, temperature=0.0, max_tokens=256)
-        jql = self._sanitize_jql(str(data.get("jql", "")))
+        try:
+            data = self._llm.chat_json(base_messages, temperature=0.0, max_tokens=256)
+            jql = self._sanitize_jql(str(data.get("jql", "")))
+        except LLMError as exc:
+            logger.warning("PM Agent JSON-mode response failed; falling back to plain text JQL parse: %s", exc)
+            raw = self._llm.chat(base_messages, temperature=0.0, max_tokens=256)
+            jql = self._extract_jql_from_raw(raw)
         jql = self._fix_common_jql_typos(jql)
         errors = self._lexical_errors(jql)
         if not errors:
@@ -122,8 +128,13 @@ class PMAgent:
                 ),
             },
         ]
-        repaired = self._llm.chat_json(repair_messages, temperature=0.0, max_tokens=256)
-        jql = self._sanitize_jql(str(repaired.get("jql", "")))
+        try:
+            repaired = self._llm.chat_json(repair_messages, temperature=0.0, max_tokens=256)
+            jql = self._sanitize_jql(str(repaired.get("jql", "")))
+        except LLMError as exc:
+            logger.warning("PM Agent repair JSON-mode failed; falling back to plain text JQL parse: %s", exc)
+            raw = self._llm.chat(repair_messages, temperature=0.0, max_tokens=256)
+            jql = self._extract_jql_from_raw(raw)
         jql = self._fix_common_jql_typos(jql)
         if self._lexical_errors(jql):
             return self._fallback_jql(project_key)
@@ -162,3 +173,19 @@ class PMAgent:
         if project_key and project_key != "not set":
             return f'project = "{project_key}" ORDER BY updated DESC'
         return "ORDER BY updated DESC"
+
+    def _extract_jql_from_raw(self, raw: str) -> str:
+        text = raw.strip()
+        # If provider returned JSON-like text without honoring JSON mode, extract it.
+        try:
+            parsed = extract_json(text)
+            if isinstance(parsed, dict) and "jql" in parsed:
+                return self._sanitize_jql(str(parsed["jql"]))
+        except ValueError:
+            pass
+
+        # Common fallback: response includes a labeled line like "JQL: ...".
+        labeled = re.search(r"^\s*JQL\s*:\s*(.+)$", text, flags=re.IGNORECASE | re.MULTILINE)
+        if labeled:
+            return self._sanitize_jql(labeled.group(1))
+        return self._sanitize_jql(text)
