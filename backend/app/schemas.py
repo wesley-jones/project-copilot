@@ -18,6 +18,7 @@ class SessionWorkspace(BaseModel):
     readiness_report: Optional[dict[str, Any]] = None
     uploaded_docs: list[str] = Field(default_factory=list)  # list of filenames (readiness)
     context_docs: dict[str, str] = Field(default_factory=dict)  # filename → extracted text (requirements)
+    jira_project_ctx: Optional[dict[str, Any]] = None  # normalized JiraProjectContext, Power Mode
 
 
 # ---------------------------------------------------------------------------
@@ -169,6 +170,32 @@ class DocUploadResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Power Mode — Jira discovery state
+# ---------------------------------------------------------------------------
+
+
+class JiraFieldInfo(BaseModel):
+    field_id: str
+    name: str
+    custom: bool
+
+
+class JiraProjectContext(BaseModel):
+    project_key: str
+    project_name: str
+    project_id: str
+    issue_types: list[str]
+    statuses: list[str]
+    field_mappings: list[JiraFieldInfo]  # project-relevant only: createmeta + sample-observed
+    required_create_fields: dict[str, dict[str, str]]  # issuetype -> {field_id: display_name}
+    can_create_issues: bool
+    can_browse: bool
+    hint_labels: list[str]       # heuristic from recent issue sample, not authoritative
+    hint_components: list[str]   # heuristic from recent issue sample, not authoritative
+    discovered_at: str
+
+
+# ---------------------------------------------------------------------------
 # PM / Jira query
 # ---------------------------------------------------------------------------
 
@@ -192,6 +219,37 @@ class PMQueryResponse(BaseModel):
     jql: str
     results: list[JiraIssueResult]
     total: int
+
+
+# ---------------------------------------------------------------------------
+# Power Mode — requests / responses / events
+# ---------------------------------------------------------------------------
+
+
+class PowerDiscoverRequest(BaseModel):
+    session_id: str
+
+
+class PowerDiscoverResponse(BaseModel):
+    session_id: str
+    project_key: str
+    project_name: str
+    issue_types: list[str]
+    statuses: list[str]
+    custom_field_count: int
+    can_create_issues: bool
+
+
+class PowerRunRequest(BaseModel):
+    session_id: str
+    goal: str
+
+
+class PowerStepEvent(BaseModel):
+    type: str  # plan | action | observe | replan | result | error | done
+    content: str
+    jql: Optional[str] = None
+    result_count: Optional[int] = None
 
 
 # ---------------------------------------------------------------------------

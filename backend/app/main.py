@@ -18,7 +18,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from backend.app.config import get_settings
-from backend.app.routers import ba, jira, pm
+from backend.app.routers import ba, jira, pm, power
 from backend.app.services.ba_agent import BAAgent
 from backend.app.services.document_store import get_document_store
 from backend.app.services.jira_client import JiraError, get_jira_client
@@ -58,6 +58,7 @@ templates = Jinja2Templates(directory=str(_base / "frontend" / "templates"))
 app.include_router(ba.router)
 app.include_router(pm.router)
 app.include_router(jira.router)
+app.include_router(power.router)
 
 # ---------------------------------------------------------------------------
 # UI helpers
@@ -462,6 +463,19 @@ async def pm_export_csv(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/power", response_class=HTMLResponse)
+async def power_page(request: Request):
+    sid = _get_or_create_session(request)
+    store = get_document_store()
+    ws = store.load_workspace(sid)
+    response = templates.TemplateResponse(
+        "power_mode.html",
+        {"request": request, "session_id": sid, "workspace": ws},
+    )
+    response.set_cookie("session_id", sid, httponly=True)
+    return response
 
 
 # ---------------------------------------------------------------------------

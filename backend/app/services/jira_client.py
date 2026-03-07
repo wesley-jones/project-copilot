@@ -93,6 +93,54 @@ class JiraClient:
             ) from exc
 
     # ------------------------------------------------------------------
+    # Discovery — global bootstrap
+    # ------------------------------------------------------------------
+
+    def get_myself(self) -> dict[str, Any]:
+        return self._get("/rest/api/2/myself")
+
+    def get_server_info(self) -> dict[str, Any]:
+        return self._get("/rest/api/2/serverInfo")
+
+    def get_fields(self) -> list[dict[str, Any]]:
+        return self._get("/rest/api/2/field")
+
+    def get_my_permissions(self, project_key: Optional[str] = None) -> dict[str, Any]:
+        # Jira requires the `permissions` param listing which permissions to check.
+        params: dict[str, str] = {"permissions": "BROWSE_PROJECTS,CREATE_ISSUES,EDIT_ISSUES,ASSIGN_ISSUES"}
+        if project_key:
+            params["projectKey"] = project_key
+        return self._get("/rest/api/2/mypermissions", params=params)
+
+    def get_issue_types(self) -> list[dict[str, Any]]:
+        return self._get("/rest/api/2/issuetype")
+
+    def get_priorities(self) -> list[dict[str, Any]]:
+        return self._get("/rest/api/2/priority")
+
+    def get_statuses(self) -> list[dict[str, Any]]:
+        return self._get("/rest/api/2/status")
+
+    def get_resolutions(self) -> list[dict[str, Any]]:
+        return self._get("/rest/api/2/resolution")
+
+    # ------------------------------------------------------------------
+    # Discovery — project-scoped
+    # ------------------------------------------------------------------
+
+    def get_project(self, project_key: str) -> dict[str, Any]:
+        return self._get(f"/rest/api/2/project/{project_key}")
+
+    def get_project_statuses(self, project_key: str) -> list[dict[str, Any]]:
+        return self._get(f"/rest/api/2/project/{project_key}/statuses")
+
+    def get_create_meta(self, project_key: str) -> dict[str, Any]:
+        return self._get(
+            "/rest/api/2/issue/createmeta",
+            params={"projectKeys": project_key, "expand": "projects.issuetypes.fields"},
+        )
+
+    # ------------------------------------------------------------------
     # Issue creation helpers
     # ------------------------------------------------------------------
 
@@ -160,14 +208,50 @@ class JiraClient:
     # Search
     # ------------------------------------------------------------------
 
-    def search_issues(self, jql: str, max_results: int = 50) -> dict[str, Any]:
-        """Execute a JQL search and return the raw Jira response dict."""
+    def _search_v3_jql(self, jql: str, max_results: int, fields: Optional[list[str]] = None) -> dict[str, Any]:
+        """POST /rest/api/3/search/jql — Jira Cloud's current search endpoint (replaces v2 search)."""
+        body: dict[str, Any] = {
+            "jql": jql,
+            "maxResults": max_results,
+            "fields": fields or ["summary", "status", "issuetype", "assignee", "priority"],
+        }
+        return self._post("/rest/api/3/search/jql", body)
+
+    def search_issues(self, jql: str, max_results: int = 50, fields: Optional[str] = None) -> dict[str, Any]:
+        """Execute a JQL search. Tries v2 GET first; falls back to POST /rest/api/3/search/jql on 410."""
         params = {
             "jql": jql,
             "maxResults": max_results,
-            "fields": "summary,status,issuetype,assignee,priority",
+            "fields": fields or "summary,status,issuetype,assignee,priority",
         }
-        return self._get("/rest/api/2/search", params=params)
+        try:
+            return self._get("/rest/api/2/search", params=params)
+        except JiraError as exc:
+            if exc.status_code == 410:
+                logger.warning("GET /rest/api/2/search returned 410; falling back to POST /rest/api/3/search/jql")
+                fields_list = fields.split(",") if fields else None
+                return self._search_v3_jql(jql, max_results, fields_list)
+            raise
+
+    def search_issues_post(
+        self,
+        jql: str,
+        max_results: int = 50,
+        fields: Optional[list[str]] = None,
+    ) -> dict[str, Any]:
+        """Execute a JQL search via POST. Falls back to POST /rest/api/3/search/jql on 410."""
+        body = {
+            "jql": jql,
+            "maxResults": max_results,
+            "fields": fields or ["summary", "status", "issuetype", "assignee", "priority"],
+        }
+        try:
+            return self._post("/rest/api/2/search", body)
+        except JiraError as exc:
+            if exc.status_code == 410:
+                logger.warning("POST /rest/api/2/search returned 410; falling back to POST /rest/api/3/search/jql")
+                return self._search_v3_jql(jql, max_results, fields)
+            raise
 
     def get_issue(self, issue_key: str) -> dict[str, Any]:
         return self._get(f"/rest/api/2/issue/{issue_key}")

@@ -14,7 +14,8 @@
     <div class="nav-links">
       <a href="/" class="nav-link {% if request.url.path == '/' %}active{% endif %}">Home</a>
       <a href="/ba/requirements" class="nav-link {% if '/ba/' in request.url.path %}active{% endif %}">BA Mode</a>
-      <a href="/pm" class="nav-link {% if '/pm' in request.url.path %}active{% endif %}">PM Mode</a>
+      <a href="/pm" class="nav-link {% if request.url.path == '/pm' %}active{% endif %}">PM Mode</a>
+      <a href="/power" class="nav-link {% if '/power' in request.url.path %}active{% endif %}">Power Mode</a>
     </div>
     <span class="session-badge" title="Your session ID">Session: {{ session_id[:8] if session_id else '—' }}…</span>
   </nav>
