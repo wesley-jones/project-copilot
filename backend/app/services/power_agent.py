@@ -52,6 +52,7 @@ def _normalize_project_ctx(
     create_meta: dict,
     all_fields: list[dict],
     sample: dict,
+    fallback_issue_types: list[str] | None = None,
 ) -> JiraProjectContext:
     """Normalize raw Jira discovery responses into a compact JiraProjectContext."""
     # Basic project info
@@ -97,6 +98,8 @@ def _normalize_project_ctx(
                 required_create_fields[it_name] = required
     else:
         logger.warning("PowerAgent: createmeta returned no projects for key=%s", project_key)
+        if fallback_issue_types:
+            issue_types = fallback_issue_types
 
     # Field mappings — only fields from createmeta + fields observed in sample
     sample_field_ids: set[str] = set()
@@ -285,11 +288,16 @@ class PowerAgent:
         project = self._jira.get_project(pk)
         proj_statuses = self._jira.get_project_statuses(pk)
         proj_perms = self._jira.get_my_permissions(project_key=pk)
+        fallback_issue_types: list[str] | None = None
         try:
             create_meta = self._jira.get_create_meta(pk)
         except JiraError as exc:
-            logger.warning("PowerAgent: createmeta unavailable (%s); issue types/required fields will be empty", exc)
+            logger.warning("PowerAgent: createmeta unavailable (%s); falling back to /issuetype", exc)
             create_meta = {}
+            try:
+                fallback_issue_types = [it["name"] for it in self._jira.get_issue_types() if it.get("name")]
+            except JiraError as exc2:
+                logger.warning("PowerAgent: get_issue_types also failed (%s); issue types will be empty", exc2)
         all_fields = self._jira.get_fields()
         sample = self._jira.search_issues_post(
             f'project = "{pk}" ORDER BY updated DESC',
@@ -297,7 +305,9 @@ class PowerAgent:
             fields=["issuetype", "status", "priority", "labels", "components", "assignee", "reporter"],
         )
 
-        ctx = _normalize_project_ctx(pk, project, proj_statuses, proj_perms, create_meta, all_fields, sample)
+        ctx = _normalize_project_ctx(
+            pk, project, proj_statuses, proj_perms, create_meta, all_fields, sample, fallback_issue_types
+        )
 
         ws = self._store.load_workspace(session_id)
         ws.jira_project_ctx = ctx.model_dump()
