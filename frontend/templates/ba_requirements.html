@@ -105,10 +105,10 @@
 
     {% set s_desc = (story.description if story is mapping else story.description) %}
     {% if s_desc %}
-    <details style="margin-top:0.5rem;">
-      <summary style="cursor:pointer; font-size:0.85rem; color:var(--primary);">Description</summary>
-      <div style="margin-top:0.5rem; white-space:pre-wrap; font-size:0.85rem; color:var(--text); background:#f8fafc; border-radius:4px; padding:0.75rem;">{{ s_desc }}</div>
-    </details>
+    <div style="margin-top:0.5rem;">
+      <p style="font-size:0.85rem; font-weight:600; margin-bottom:0.35rem;">Description</p>
+      <div style="white-space:pre-wrap; font-size:0.85rem; color:var(--text); background:#f8fafc; border-radius:4px; padding:0.75rem;">{{ s_desc }}</div>
+    </div>
     {% endif %}
 
     {% set s_ac = (story.acceptance_criteria if story is mapping else story.acceptance_criteria) %}

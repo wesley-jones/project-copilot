@@ -14,6 +14,24 @@
 <div class="alert alert-error">{{ error }}</div>
 {% endif %}
 
+<!-- Approve result -->
+{% if approve_result %}
+<div class="card">
+  <p class="card-title">Approval Result — {{ approve_result.issue_key }}</p>
+  {% if approve_result.label_added %}
+  <div class="alert alert-success" style="margin-bottom:0.5rem;">Label <code>ai-approved</code> added successfully.</div>
+  {% else %}
+  <div class="alert alert-info" style="margin-bottom:0.5rem;">Label <code>ai-approved</code> was already present — not added again.</div>
+  {% endif %}
+  {% if approve_result.comment_added %}
+  <div class="alert alert-success" style="margin-bottom:0.5rem;">Approval comment added.</div>
+  {% endif %}
+  {% for err in approve_result.errors %}
+  <div class="alert alert-error" style="margin-bottom:0.5rem;">{{ err }}</div>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% set is_existing = workspace.ba_source == "existing_story" %}
 
 {% if not is_existing and not workspace.requirements_draft %}
@@ -123,24 +141,6 @@
 </div>
 {% endif %}
 
-{% endif %}
-
-<!-- Approve result -->
-{% if approve_result %}
-<div class="card">
-  <p class="card-title">Approval Result — {{ approve_result.issue_key }}</p>
-  {% if approve_result.label_added %}
-  <div class="alert alert-success" style="margin-bottom:0.5rem;">Label <code>ai-approved</code> added successfully.</div>
-  {% else %}
-  <div class="alert alert-info" style="margin-bottom:0.5rem;">Label <code>ai-approved</code> was already present — not added again.</div>
-  {% endif %}
-  {% if approve_result.comment_added %}
-  <div class="alert alert-success" style="margin-bottom:0.5rem;">Approval comment added.</div>
-  {% endif %}
-  {% for err in approve_result.errors %}
-  <div class="alert alert-error" style="margin-bottom:0.5rem;">{{ err }}</div>
-  {% endfor %}
-</div>
 {% endif %}
 
 <!-- Jira result -->
