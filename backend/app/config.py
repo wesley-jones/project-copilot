@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     llm_secret_key: str = ""
     llm_timeout: int = 300
     llm_max_retries: int = 2
+    llm_max_tokens: int = 4096
     # Set to false for models that reject the temperature parameter (e.g. gpt-5, o1, o3)
     llm_temperature_supported: bool = True
     # Optional fixed seed for providers/models that support deterministic sampling.

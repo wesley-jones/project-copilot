@@ -26,7 +26,6 @@ from backend.app.services.prompt_loader import PromptLoader
 logger = logging.getLogger(__name__)
 
 MAX_ITERATIONS = 5
-POWER_MAX_TOKENS = 4096
 MAX_SUMMARY_CUSTOM_FIELDS = 30
 MAX_SUMMARY_HINTS = 8
 
@@ -544,7 +543,7 @@ class PowerAgent:
             logger.info("PowerAgent iteration %d/%d session=%s", iteration + 1, MAX_ITERATIONS, session_id)
 
             try:
-                response = self._llm.chat_json(messages, temperature=0.1, max_tokens=POWER_MAX_TOKENS)
+                response = self._llm.chat_json(messages, temperature=0.1)
             except LLMError as exc:
                 yield PowerStepEvent(type="error", content=f"LLM error: {exc}")
                 yield PowerStepEvent(type="done", content="")
@@ -608,7 +607,7 @@ class PowerAgent:
             ),
         })
         try:
-            final = self._llm.chat_json(messages, temperature=0.1, max_tokens=POWER_MAX_TOKENS)
+            final = self._llm.chat_json(messages, temperature=0.1)
             report = str(final.get("report", "Maximum iterations reached. Partial analysis only."))
         except LLMError as exc:
             report = f"Could not synthesize after max iterations: {exc}"

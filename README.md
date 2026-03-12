@@ -42,6 +42,7 @@ Edit `.env` and fill in:
 | `LLM_API_BASE` | OpenAI-compatible API base URL (e.g. `https://api.openai.com/v1`) |
 | `LLM_MODEL_NAME` | Model name (e.g. `gpt-4o`) |
 | `LLM_API_KEY` | Your API key |
+| `LLM_MAX_TOKENS` | Default completion token limit used by BA, PM, and Power LLM calls |
 | `JIRA_BASE_URL` | Your Jira instance URL (optional — dry-run works without it) |
 | `JIRA_USER` | Jira account email |
 | `JIRA_API_TOKEN` | Jira API token |

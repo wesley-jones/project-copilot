@@ -14,7 +14,6 @@ from backend.app.services.prompt_loader import PromptLoader
 from backend.app.utils import extract_json
 
 logger = logging.getLogger(__name__)
-PM_MAX_TOKENS = 4096
 
 
 class PMAgent:
@@ -117,11 +116,11 @@ class PMAgent:
 
     def _generate_jql(self, base_messages: list[dict[str, str]], project_key: str) -> str:
         try:
-            data = self._llm.chat_json(base_messages, temperature=0.0, max_tokens=PM_MAX_TOKENS)
+            data = self._llm.chat_json(base_messages, temperature=0.0)
             jql = self._sanitize_jql(str(data.get("jql", "")))
         except LLMError as exc:
             logger.warning("PM Agent JSON-mode response failed; falling back to plain text JQL parse: %s", exc)
-            raw = self._llm.chat(base_messages, temperature=0.0, max_tokens=PM_MAX_TOKENS)
+            raw = self._llm.chat(base_messages, temperature=0.0)
             jql = self._extract_jql_from_raw(raw)
         jql = self._fix_common_jql_typos(jql)
         errors = self._lexical_errors(jql)
@@ -150,11 +149,11 @@ class PMAgent:
             },
         ]
         try:
-            repaired = self._llm.chat_json(repair_messages, temperature=0.0, max_tokens=PM_MAX_TOKENS)
+            repaired = self._llm.chat_json(repair_messages, temperature=0.0)
             jql = self._sanitize_jql(str(repaired.get("jql", "")))
         except LLMError as exc:
             logger.warning("PM Agent repair JSON-mode failed; falling back to plain text JQL parse: %s", exc)
-            raw = self._llm.chat(repair_messages, temperature=0.0, max_tokens=PM_MAX_TOKENS)
+            raw = self._llm.chat(repair_messages, temperature=0.0)
             jql = self._extract_jql_from_raw(raw)
         jql = self._fix_common_jql_typos(jql)
         if self._lexical_errors(jql):

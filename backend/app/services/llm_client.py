@@ -29,6 +29,10 @@ class LLMClient:
         self._settings = get_settings()
 
     @property
+    def default_max_tokens(self) -> int:
+        return self._settings.llm_max_tokens
+
+    @property
     def _base_url(self) -> str:
         return self._settings.llm_api_base.rstrip("/")
 
@@ -52,12 +56,13 @@ class LLMClient:
         *,
         json_mode: bool = False,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: Optional[int] = None,
     ) -> dict[str, Any]:
+        resolved_max_tokens = self._settings.llm_max_tokens if max_tokens is None else max_tokens
         payload: dict[str, Any] = {
             "model": self._settings.llm_model_name,
             "messages": messages,
-            self._settings.llm_max_tokens_param: max_tokens,
+            self._settings.llm_max_tokens_param: resolved_max_tokens,
         }
         if self._settings.llm_temperature_supported:
             payload["temperature"] = temperature
@@ -73,7 +78,7 @@ class LLMClient:
         *,
         json_mode: bool = False,
         temperature: float = 0.2,
-        max_tokens: int = 4096,
+        max_tokens: Optional[int] = None,
     ) -> str:
         """
         Send a chat completion request. Returns the assistant message content.
@@ -129,7 +134,7 @@ class LLMClient:
         messages: list[dict[str, str]],
         *,
         temperature: float = 0.1,
-        max_tokens: int = 4096,
+        max_tokens: Optional[int] = None,
     ) -> Any:
         """
         Chat completion that returns parsed JSON.
@@ -141,6 +146,7 @@ class LLMClient:
             return extract_json(raw)
         except ValueError as first_err:
             logger.warning("JSON parse failed on first attempt: %s - attempting repair", first_err)
+            logger.warning("Raw LLM output (first attempt):\n%s", raw)
             repair_messages = messages + [
                 {"role": "assistant", "content": raw},
                 {
@@ -159,6 +165,7 @@ class LLMClient:
             try:
                 return extract_json(raw2)
             except ValueError as second_err:
+                logger.warning("Raw LLM output (repair attempt):\n%s", raw2)
                 raise LLMError(
                     f"LLM produced invalid JSON after repair attempt: {second_err}"
                 ) from second_err
