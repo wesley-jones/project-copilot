@@ -58,6 +58,18 @@ class ChunkStore:
         """Return all ChunkRecords belonging to *artifact_id*."""
         return [r for r in self.list_all() if r.artifact_id == artifact_id]
 
+    def delete_by_artifact(self, artifact_id: str) -> int:
+        """Delete all ChunkRecords belonging to *artifact_id*. Returns the count removed."""
+        removed = 0
+        self._ensure_dirs()
+        for path in sorted(self._dir.glob(f"{artifact_id}-chunk-*.json")):
+            try:
+                path.unlink()
+                removed += 1
+            except Exception as exc:
+                logger.warning("ChunkStore: failed to delete %s (%s)", path.name, exc)
+        return removed
+
 
 def get_chunk_store() -> ChunkStore:
     return ChunkStore()

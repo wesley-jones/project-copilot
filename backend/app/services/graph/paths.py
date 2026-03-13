@@ -35,6 +35,11 @@ def chunks_dir() -> Path:
     return knowledge_root() / "chunks"
 
 
+def indexes_dir() -> Path:
+    """Directory for lexical retrieval index JSON files."""
+    return knowledge_root() / "indexes"
+
+
 def edges_dir() -> Path:
     """Directory for GraphEdge JSON files."""
     return knowledge_root() / "edges"
@@ -47,7 +52,7 @@ def runs_dir() -> Path:
 
 def ensure_knowledge_dirs() -> None:
     """Create all knowledge subdirectories if they do not already exist."""
-    for d in (raw_dir(), artifacts_dir(), chunks_dir(), edges_dir(), runs_dir()):
+    for d in (raw_dir(), artifacts_dir(), chunks_dir(), indexes_dir(), edges_dir(), runs_dir()):
         d.mkdir(parents=True, exist_ok=True)
 
 

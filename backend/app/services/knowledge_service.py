@@ -7,10 +7,12 @@ adds no business logic of its own.
 """
 from __future__ import annotations
 
+import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Any
 
+from backend.app.config import get_settings
 from backend.app.services.graph.artifact_store import get_artifact_store
 from backend.app.services.graph.chunk_store import get_chunk_store
 from backend.app.services.graph.edge_store import get_edge_store
@@ -29,6 +31,8 @@ from backend.app.services.graph.models import (
     SourceSystem,
     SourceType,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class KnowledgeService:
@@ -94,6 +98,10 @@ class KnowledgeService:
         if artifact_id:
             return self._chunks.list_by_artifact(artifact_id)
         return self._chunks.list_all()
+
+    def delete_chunks_by_artifact(self, artifact_id: str) -> int:
+        """Delete all chunks belonging to *artifact_id* and return the count removed."""
+        return self._chunks.delete_by_artifact(artifact_id)
 
     # ------------------------------------------------------------------
     # Edges
@@ -233,6 +241,91 @@ class KnowledgeService:
             needle = title_contains.lower()
             results = [r for r in results if needle in r.metadata.title.lower()]
         return results
+
+    # ------------------------------------------------------------------
+    # Phase 2 chunking, indexing, and retrieval
+    # ------------------------------------------------------------------
+
+    def chunk_artifact(
+        self,
+        artifact_id: str,
+        run_id: str | None = None,
+        rebuild_index: bool | None = None,
+    ) -> list[ChunkRecord]:
+        """Chunk a single artifact and return the saved ChunkRecords."""
+        from backend.app.services.pipelines.chunk_pipeline import get_chunk_pipeline
+
+        resolved_run_id = run_id or uuid.uuid4().hex
+        return get_chunk_pipeline().run(
+            resolved_run_id,
+            artifact_id,
+            self,
+            rebuild_index=rebuild_index,
+        )
+
+    def chunk_all_artifacts(self, run_id: str | None = None) -> dict[str, int]:
+        """Chunk all artifacts in stable order and optionally rebuild the index once."""
+        artifacts = self.list_artifacts()
+        resolved_run_id = run_id or uuid.uuid4().hex
+        auto_rebuild = get_settings().knowledge_rebuild_index_on_chunk_ingest
+
+        summary = {
+            "artifacts_seen": len(artifacts),
+            "artifacts_chunked": 0,
+            "chunks_created": 0,
+            "artifacts_failed": 0,
+        }
+        for artifact in sorted(artifacts, key=lambda item: item.metadata.artifact_id):
+            try:
+                chunks = self.chunk_artifact(
+                    artifact.metadata.artifact_id,
+                    run_id=resolved_run_id,
+                    rebuild_index=False,
+                )
+                summary["artifacts_chunked"] += 1
+                summary["chunks_created"] += len(chunks)
+            except Exception as exc:
+                logger.warning(
+                    "KnowledgeService.chunk_all_artifacts: failed for %s (%s)",
+                    artifact.metadata.artifact_id,
+                    exc,
+                )
+                summary["artifacts_failed"] += 1
+
+        if auto_rebuild:
+            self.rebuild_index()
+
+        return summary
+
+    def rebuild_index(self) -> dict[str, int]:
+        """Rebuild the lexical chunk index from the current chunk corpus."""
+        from backend.app.services.indexing import get_indexer
+
+        return get_indexer().rebuild(self)
+
+    def search_chunks(
+        self,
+        q: str,
+        project_key: str | None = None,
+        source_system: SourceSystem | None = None,
+        artifact_kind: ArtifactKind | None = None,
+        artifact_id: str | None = None,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search indexed chunks using Phase 2 lexical retrieval."""
+        from backend.app.services.indexing import get_retriever
+
+        settings = get_settings()
+        resolved_limit = limit if limit is not None else settings.knowledge_search_default_limit
+        resolved_limit = max(1, min(resolved_limit, settings.knowledge_search_max_limit))
+        return get_retriever().search(
+            q=q,
+            project_key=project_key,
+            source_system=source_system,
+            artifact_kind=artifact_kind,
+            artifact_id=artifact_id,
+            limit=resolved_limit,
+        )
 
 
 def get_knowledge_service() -> KnowledgeService:

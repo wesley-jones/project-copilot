@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     knowledge_local_docs_dir: Path = Path("local_data/knowledge_docs")
     knowledge_jira_max_results: int = 200
     knowledge_max_file_bytes: int = 20_971_520  # 20 MB guard for local file ingest
+    knowledge_chunk_target_chars: int = 2000
+    knowledge_chunk_overlap_chars: int = 200
+    knowledge_max_chunks_per_artifact: int = 200
+    knowledge_index_case_sensitive: bool = False
+    knowledge_search_default_limit: int = 20
+    knowledge_search_max_limit: int = 100
+    knowledge_rebuild_index_on_chunk_ingest: bool = True
 
     def __repr__(self) -> str:
         return (

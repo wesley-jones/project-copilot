@@ -10,6 +10,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException, Query
 
+from backend.app.config import get_settings
 from backend.app.schemas_knowledge import JiraIngestRequest, LocalDocsIngestRequest
 from backend.app.services.graph.models import ArtifactKind, SourceSystem
 from backend.app.services.knowledge_service import get_knowledge_service
@@ -91,6 +92,76 @@ def get_artifact(artifact_id: str):
 def list_chunks(artifact_id: str | None = None):
     """List chunks, optionally filtered to a single artifact_id query param."""
     return [r.model_dump(mode="json") for r in _svc().list_chunks(artifact_id=artifact_id)]
+
+
+@router.post("/chunk/{artifact_id}")
+def chunk_artifact(artifact_id: str):
+    """Chunk a single artifact and return a summary."""
+    try:
+        chunks = _svc().chunk_artifact(artifact_id)
+        return {
+            "artifact_id": artifact_id,
+            "chunk_count": len(chunks),
+            "chunk_ids": [chunk.chunk_id for chunk in chunks[:10]],
+        }
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("chunk_artifact: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Chunking error: {exc}") from exc
+
+
+@router.post("/chunk-all")
+def chunk_all_artifacts():
+    """Chunk all artifacts and return summary counters."""
+    try:
+        return _svc().chunk_all_artifacts()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("chunk_all_artifacts: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Chunking error: {exc}") from exc
+
+
+@router.post("/index/rebuild")
+def rebuild_index():
+    """Rebuild the lexical chunk index and return basic stats."""
+    try:
+        return _svc().rebuild_index()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("rebuild_index: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Index rebuild error: {exc}") from exc
+
+
+@router.get("/search")
+def search_chunks(
+    q: str = Query(...),
+    project_key: str | None = Query(default=None),
+    source_system: SourceSystem | None = Query(default=None),
+    artifact_kind: ArtifactKind | None = Query(default=None),
+    artifact_id: str | None = Query(default=None),
+    limit: int | None = Query(default=None),
+):
+    """Search indexed chunks using the Phase 2 lexical retriever."""
+    try:
+        settings = get_settings()
+        resolved_limit = limit if limit is not None else settings.knowledge_search_default_limit
+        resolved_limit = max(1, min(resolved_limit, settings.knowledge_search_max_limit))
+        return _svc().search_chunks(
+            q=q,
+            project_key=project_key,
+            source_system=source_system,
+            artifact_kind=artifact_kind,
+            artifact_id=artifact_id,
+            limit=resolved_limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("search_chunks: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Search error: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
