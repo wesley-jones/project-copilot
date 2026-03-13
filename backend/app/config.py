@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     knowledge_search_default_limit: int = 20
     knowledge_search_max_limit: int = 100
     knowledge_rebuild_index_on_chunk_ingest: bool = True
+    knowledge_appian_exports_dir: Path = Path("local_data/appian_exports")
+    knowledge_appian_extract_recursive: bool = True
+    knowledge_appian_max_file_bytes: int = 52_428_800
+    knowledge_entity_min_token_len: int = 3
+    knowledge_entity_max_per_chunk: int = 50
+    knowledge_linking_enable_jira_refs: bool = True
+    knowledge_linking_enable_keyword_overlap: bool = True
+    knowledge_linking_overlap_threshold: int = 3
+    knowledge_linking_max_related_per_artifact: int = 25
 
     def __repr__(self) -> str:
         return (

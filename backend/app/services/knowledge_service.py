@@ -116,6 +116,10 @@ class KnowledgeService:
     def list_edges(self) -> list[GraphEdge]:
         return self._edges.list_all()
 
+    def delete_edges_by_artifact(self, artifact_id: str) -> int:
+        """Delete all edges touching *artifact_id* or its chunks and return the count removed."""
+        return self._edges.delete_by_artifact(artifact_id)
+
     # ------------------------------------------------------------------
     # Bootstrap
     # ------------------------------------------------------------------
@@ -214,6 +218,25 @@ class KnowledgeService:
         from backend.app.services.pipelines.ingest_pipeline import get_ingest_pipeline
 
         source = get_local_docs_ingestion_source()
+        run = self.create_run(source.source_name, source.source_type)
+        kwargs: dict[str, Any] = {"recursive": recursive}
+        if root_dir:
+            kwargs["root_dir"] = root_dir
+        if project_key:
+            kwargs["project_key"] = project_key
+        return get_ingest_pipeline().run(run.run_id, source, self, **kwargs)
+
+    def run_appian_ingestion(
+        self,
+        root_dir: str | None = None,
+        project_key: str | None = None,
+        recursive: bool = True,
+    ) -> IngestionRun:
+        """Trigger an Appian XML/ZIP ingestion run and return the completed IngestionRun."""
+        from backend.app.services.ingestion.appian_ingestor import get_appian_ingestion_source
+        from backend.app.services.pipelines.ingest_pipeline import get_ingest_pipeline
+
+        source = get_appian_ingestion_source()
         run = self.create_run(source.source_name, source.source_type)
         kwargs: dict[str, Any] = {"recursive": recursive}
         if root_dir:
@@ -326,6 +349,51 @@ class KnowledgeService:
             artifact_id=artifact_id,
             limit=resolved_limit,
         )
+
+    # ------------------------------------------------------------------
+    # Phase 3 linking and related artifacts
+    # ------------------------------------------------------------------
+
+    def link_artifact(self, artifact_id: str, run_id: str | None = None) -> dict[str, int]:
+        """Run rule-based linking for one artifact and return summary counts."""
+        from backend.app.services.pipelines.link_pipeline import get_link_pipeline
+
+        resolved_run_id = run_id or uuid.uuid4().hex
+        return get_link_pipeline().run(resolved_run_id, self, artifact_id=artifact_id)
+
+    def link_all_artifacts(self, run_id: str | None = None) -> dict[str, int]:
+        """Run rule-based linking across all artifacts and return summary counts."""
+        from backend.app.services.pipelines.link_pipeline import get_link_pipeline
+
+        resolved_run_id = run_id or uuid.uuid4().hex
+        return get_link_pipeline().run(resolved_run_id, self)
+
+    def get_related_artifacts(self, artifact_id: str, limit: int = 10) -> list[dict[str, Any]]:
+        """Return conservative related-artifact results for *artifact_id*."""
+        from backend.app.services.graph.linker import Linker
+
+        return Linker().related_artifacts(self, artifact_id, limit=limit)
+
+    def get_artifact_entities(self, artifact_id: str) -> dict[str, Any]:
+        """Return extracted artifact and chunk entities for inspection/debugging."""
+        from backend.app.services.graph.entity_extractor import get_entity_extractor
+
+        artifact = self.get_artifact(artifact_id)
+        if artifact is None:
+            raise ValueError(f"Artifact '{artifact_id}' not found.")
+        extractor = get_entity_extractor()
+        chunks = self.list_chunks(artifact_id)
+        return {
+            "artifact_id": artifact_id,
+            "artifact_entities": extractor.extract_from_artifact(artifact),
+            "chunk_entities": [
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "entities": extractor.extract_from_chunk(chunk),
+                }
+                for chunk in sorted(chunks, key=lambda item: (item.chunk_index, item.chunk_id))
+            ],
+        }
 
 
 def get_knowledge_service() -> KnowledgeService:

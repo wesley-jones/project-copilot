@@ -33,6 +33,16 @@ class RawStore:
             logger.warning("RawStore: failed to write jira raw %s/%s (%s)", run_id, issue_key, exc)
         return dest.relative_to(paths.knowledge_root()).as_posix()
 
+    def save_appian_raw(self, run_id: str, source_path: Path, dest_name: str) -> str:
+        """Copy an Appian XML or ZIP source into raw/appian/{run_id}/ and return the ref."""
+        dest = paths.raw_dir() / "appian" / run_id / dest_name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            shutil.copy2(source_path, dest)
+        except Exception as exc:
+            logger.warning("RawStore: failed to copy %s (%s)", source_path, exc)
+        return dest.relative_to(paths.knowledge_root()).as_posix()
+
     def save_local_raw(self, run_id: str, source_path: Path, dest_name: str) -> str:
         """Copy source_path → raw/local/{run_id}/{dest_name}. Returns ref string."""
         dest = paths.raw_dir() / "local" / run_id / dest_name

@@ -14,3 +14,9 @@ class LocalDocsIngestRequest(BaseModel):
     root_dir: str | None = None
     project_key: str | None = None
     recursive: bool = True
+
+
+class AppianIngestRequest(BaseModel):
+    root_dir: str | None = None
+    project_key: str | None = None
+    recursive: bool | None = None

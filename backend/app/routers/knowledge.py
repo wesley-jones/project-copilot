@@ -11,7 +11,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Query
 
 from backend.app.config import get_settings
-from backend.app.schemas_knowledge import JiraIngestRequest, LocalDocsIngestRequest
+from backend.app.schemas_knowledge import AppianIngestRequest, JiraIngestRequest, LocalDocsIngestRequest
 from backend.app.services.graph.models import ArtifactKind, SourceSystem
 from backend.app.services.knowledge_service import get_knowledge_service
 
@@ -175,6 +175,54 @@ def list_edges():
     return [e.model_dump(mode="json") for e in _svc().list_edges()]
 
 
+@router.post("/link/{artifact_id}")
+def link_artifact(artifact_id: str):
+    """Run rule-based linking for a single artifact and return summary counts."""
+    try:
+        return _svc().link_artifact(artifact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("link_artifact: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Linking error: {exc}") from exc
+
+
+@router.post("/link-all")
+def link_all_artifacts():
+    """Run rule-based linking across all artifacts and return summary counts."""
+    try:
+        return _svc().link_all_artifacts()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("link_all_artifacts: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Linking error: {exc}") from exc
+
+
+@router.get("/related/{artifact_id}")
+def related_artifacts(artifact_id: str, limit: int = Query(default=10)):
+    """Return conservative related-artifact results for inspection/debugging."""
+    try:
+        return _svc().get_related_artifacts(artifact_id, limit=max(1, limit))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("related_artifacts: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Related artifact error: {exc}") from exc
+
+
+@router.get("/entities/{artifact_id}")
+def get_artifact_entities(artifact_id: str):
+    """Return extracted artifact and chunk entities for inspection/debugging."""
+    try:
+        return _svc().get_artifact_entities(artifact_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("get_artifact_entities: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Entity extraction error: {exc}") from exc
+
+
 # ---------------------------------------------------------------------------
 # Bootstrap (dev only)
 # ---------------------------------------------------------------------------
@@ -224,4 +272,26 @@ def ingest_local_docs(body: LocalDocsIngestRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         logger.exception("ingest_local_docs: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Ingestion error: {exc}") from exc
+
+
+@router.post("/ingest/appian")
+def ingest_appian(body: AppianIngestRequest):
+    """Trigger an Appian XML/ZIP ingestion run. Returns the completed IngestionRun as JSON."""
+    try:
+        settings = get_settings()
+        run = _svc().run_appian_ingestion(
+            root_dir=body.root_dir,
+            project_key=body.project_key,
+            recursive=(
+                body.recursive
+                if body.recursive is not None
+                else settings.knowledge_appian_extract_recursive
+            ),
+        )
+        return run.model_dump(mode="json")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("ingest_appian: %s", exc)
         raise HTTPException(status_code=500, detail=f"Ingestion error: {exc}") from exc

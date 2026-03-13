@@ -1,33 +1,42 @@
 """
-Link pipeline — derives GraphEdge relationships between artifacts and chunks.
-
-Responsibilities (Phase 3 TODO):
-  - Traverse explicit Jira issue links (blocks, relates_to, child_of, …).
-  - Derive semantic similarity edges between chunks using embeddings.
-  - Persist GraphEdge objects via KnowledgeService.
-
-Planned work:
-  - TODO Phase 3: implement Jira link traversal from ArtifactMetadata.url
-  - TODO Phase 3: implement semantic similarity via embedding comparison
-  - TODO Phase 3: implement reference extraction from text_content
+Link pipeline - derives deterministic GraphEdge relationships between artifacts and chunks.
 """
 from __future__ import annotations
 
-from typing import Any
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any
+
+from backend.app.services.graph.linker import Linker
+
+if TYPE_CHECKING:
+    from backend.app.services.knowledge_service import KnowledgeService
 
 
 class LinkPipeline:
-    """Scaffold — full implementation deferred to Phase 3."""
+    """Run the Phase 3 rule-based linker for one artifact or the full corpus."""
 
-    def run(self, run_id: str, **kwargs: Any) -> None:
-        """Derive and persist graph edges for all artifacts in the current run.
+    def __init__(self, linker: Linker | None = None) -> None:
+        self._linker = linker if linker is not None else Linker()
 
-        Args:
-            run_id: Active IngestionRun ID; used to filter artifacts and tag edges.
-            **kwargs: Future options (similarity_threshold, edge_types, …).
-        """
-        # TODO Phase 3: load artifacts for run_id via KnowledgeService.list_artifacts()
-        # TODO Phase 3: infer edges from Jira link fields
-        # TODO Phase 3: infer edges from semantic similarity between chunks
-        # TODO Phase 3: save each GraphEdge via KnowledgeService.save_edge()
-        raise NotImplementedError
+    def run(
+        self,
+        run_id: str,
+        service: "KnowledgeService",
+        artifact_id: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, int]:
+        """Link one artifact or all artifacts and return summary counts."""
+        if artifact_id:
+            edges = self._linker.link_artifact(service, artifact_id, run_id=run_id)
+            return {
+                "artifacts_seen": 1,
+                "artifacts_linked": 1,
+                "edges_created": len(edges),
+                "artifacts_failed": 0,
+            }
+        return self._linker.link_all(service, run_id=run_id)
+
+
+@lru_cache
+def get_link_pipeline() -> LinkPipeline:
+    return LinkPipeline()

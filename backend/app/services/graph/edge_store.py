@@ -54,6 +54,27 @@ class EdgeStore:
                 logger.warning("EdgeStore: skipping malformed file %s (%s)", p.name, exc)
         return edges
 
+    def delete_by_artifact(self, artifact_id: str) -> int:
+        """Delete edges touching *artifact_id* or its deterministic chunk IDs."""
+        removed = 0
+        chunk_prefix = f"{artifact_id}-chunk-"
+        for edge in self.list_all():
+            if not (
+                edge.from_id == artifact_id
+                or edge.to_id == artifact_id
+                or edge.from_id.startswith(chunk_prefix)
+                or edge.to_id.startswith(chunk_prefix)
+            ):
+                continue
+            path = self._dir / f"{edge.edge_id}.json"
+            try:
+                if path.exists():
+                    path.unlink()
+                    removed += 1
+            except Exception as exc:
+                logger.warning("EdgeStore: failed to delete %s (%s)", path.name, exc)
+        return removed
+
 
 def get_edge_store() -> EdgeStore:
     return EdgeStore()
