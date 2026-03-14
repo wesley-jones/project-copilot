@@ -207,7 +207,8 @@ marimo/_lsp/
 __marimo__/
 
 # Delivery Navigator — local session data
-local_data/*/
+data/
+local_data/
 
 # Secrets
 .env
